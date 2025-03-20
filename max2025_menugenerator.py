@@ -2,6 +2,31 @@ import os
 import uuid
 from pymxs import runtime as rt
 
+
+# ============================
+# Configuration Section
+# ============================
+
+# Replace with the path to load scripts from
+TOOLS_DIRECTORY = rt.getDir(rt.name("userMacros"))
+
+# Menu settings
+MENU_SETTINGS = {
+    "root_directory_path": TOOLS_DIRECTORY,
+    "main_menu_name": "Tools Menu",
+    "quad_menu_name": "Tools Quad",
+    "quad_menu_modifier_keys": "ALT",      # Options: "NONE", "ALT", "CTRL", "CTRL+ALT", etc.
+    "quad_menu_position": "BOTTOM_LEFT",   # Options: "TOP_LEFT", "TOP_RIGHT", "BOTTOM_RIGHT", "BOTTOM_LEFT"
+    "print_tree": False                    # Set to True to print the directory tree structure
+}
+
+# Placeholder for the MenuGenerator instance
+MENU_GENERATOR = None
+
+
+# ============================
+# MenuGenerator Class
+# ============================
 class MenuGenerator:
     """
     A generic class to generate menus in 3ds Max based on a directory structure.
@@ -171,6 +196,20 @@ class MenuGenerator:
 
     # Register both menus with 3ds Max, then reload UI config.
     # =======================================================
+    def load_macro(self, macro_path):
+        try:
+            rt.fileIn(macro_path)
+            print(f"Loaded macro: {macro_path}")
+        except Exception as e:
+            print(f"Error loading macro {macro_path}: {str(e)}")
+
+    def load_all_macros(self, node):
+        if node["type"] == "file" and node["path"].lower().endswith(".mcr"):
+            self.load_macro(node["path"])
+        elif node["type"] == "directory":
+            for child in node["children"]:
+                self.load_all_macros(child)
+
     def register_menus(self, main_menu_callback_id="menu_callback", quad_menu_callback_id="quad_menu_callback"):
         """
         Registers the defined main and quad menus with 3ds Max.
@@ -179,6 +218,9 @@ class MenuGenerator:
             main_menu_callback_id (str, optional): The callback ID for the main menu. Defaults to "menu_callback".
             quad_menu_callback_id (str, optional): The callback ID for the quad menu. Defaults to "quad_menu_callback".
         """
+        # Load all macros
+        self.load_all_macros(self.directory_tree)
+
         rt.callbacks.removeScripts(id=rt.name(main_menu_callback_id))
         rt.callbacks.addScript(rt.name("cuiRegisterMenus"), self.define_main_menu, id=rt.name(main_menu_callback_id))
         rt.callbacks.removeScripts(id=rt.name(quad_menu_callback_id))
@@ -188,22 +230,23 @@ class MenuGenerator:
         iCuiQuadMenuMgr = rt.maxOps.GetICuiQuadMenuMgr()
         iCuiQuadMenuMgr.LoadConfiguration(iCuiQuadMenuMgr.GetCurrentConfiguration())
 
-# Example Usage
-# =======================================================
-if __name__ == "__main__":
-    # Define the root directory for the menu
-    tools_directory = os.path.join(rt.getDir(rt.name("userMacros")), "Jorn Tools")
-    tools_directory = rt.getDir(rt.name("userMacros"))
 
-    # Create an instance of the MenuGenerator with custom settings
-    menu_generator = MenuGenerator(
-        root_directory_path=tools_directory,
-        main_menu_name="Custom Tools",
-        quad_menu_name="Custom Tools Quad",
-        quad_menu_modifier_keys="ALT",
-        quad_menu_position="BOTTOM_LEFT",
-        print_tree=True
+# ============================
+# Initialize and Register Menus
+# ============================
+if __name__ == "__main__":
+    # Instantiate the MenuGenerator with the MENU_SETTINGS
+    MENU_GENERATOR = MenuGenerator(
+        root_directory_path=MENU_SETTINGS["root_directory_path"],
+        main_menu_name=MENU_SETTINGS["main_menu_name"],
+        quad_menu_name=MENU_SETTINGS["quad_menu_name"],
+        quad_menu_modifier_keys=MENU_SETTINGS["quad_menu_modifier_keys"],
+        quad_menu_position=MENU_SETTINGS["quad_menu_position"],
+        print_tree=MENU_SETTINGS["print_tree"]
     )
 
-    # Register the menus
-    menu_generator.register_menus(main_menu_callback_id="custom_menu", quad_menu_callback_id="custom_quad_menu")
+    # Register the menus with custom callback IDs
+    MENU_GENERATOR.register_menus(
+        main_menu_callback_id="custom_menu",
+        quad_menu_callback_id="custom_quadmenu"
+    )
